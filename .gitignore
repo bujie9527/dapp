@@ -9,6 +9,7 @@ node_modules/
 *.pem
 docs/github.txt
 docs/Hostinger MCP.txt
+docs/server-ssh.txt
 
 # Build and runtime
 .next/

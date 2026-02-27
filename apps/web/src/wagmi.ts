@@ -8,7 +8,14 @@ export const config = createConfig({
   chains: [base],
   connectors: [
     injected(),
-    ...(projectId ? [walletConnect({ projectId })] : []),
+    ...(projectId
+      ? [
+          walletConnect({
+            projectId,
+            showQrModal: false, // We handle URI ourselves: mobile = deep link, desktop = QR in UI
+          }),
+        ]
+      : []),
   ],
   transports: {
     [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC_URL ?? "https://mainnet.base.org"),
