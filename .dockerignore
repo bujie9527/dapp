@@ -1,0 +1,32 @@
+# 避免 Windows 下 tar 对 node_modules 报 unknown file mode
+node_modules
+**/node_modules
+.pnpm-store
+**/.pnpm
+.pnpm-debug.log
+
+# 不参与构建
+.git
+.gitignore
+*.md
+.env
+.env.*
+!.env.example
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# 构建产物与缓存
+dist
+**/dist
+.next
+**/.next
+*.log
+coverage
+.turbo
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo

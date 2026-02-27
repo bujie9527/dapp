@@ -1,0 +1,53 @@
+# 生产环境：端口仅绑定 127.0.0.1，由宿主机 Nginx 反代；前端构建时注入 NEXT_PUBLIC_*
+# 使用：cp .env.example .env && 编辑 .env 后执行 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  api:
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      COOKIE_SECURE: "true"
+      CHARGER_PRIVATE_KEY: ${CHARGER_PRIVATE_KEY}
+      CHARGER_CONTRACT_ADDRESS: ${CHARGER_CONTRACT_ADDRESS}
+      BASE_RPC_URL: ${BASE_RPC_URL:-https://mainnet.base.org}
+      ADMIN_USER: ${ADMIN_USER}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ALLOW_BASIC_AUTH: ${ALLOW_BASIC_AUTH:-false}
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.sourcofsun.online}
+        NEXT_PUBLIC_BASE_RPC_URL: ${NEXT_PUBLIC_BASE_RPC_URL:-https://mainnet.base.org}
+        NEXT_PUBLIC_USDT_ADDRESS: ${NEXT_PUBLIC_USDT_ADDRESS:-}
+        NEXT_PUBLIC_CHARGER_CONTRACT_ADDRESS: ${NEXT_PUBLIC_CHARGER_CONTRACT_ADDRESS:-}
+        NEXT_PUBLIC_DEFAULT_APPROVE_AMOUNT: ${NEXT_PUBLIC_DEFAULT_APPROVE_AMOUNT:-}
+        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.sourcofsun.online}
+      NEXT_PUBLIC_BASE_RPC_URL: ${NEXT_PUBLIC_BASE_RPC_URL:-https://mainnet.base.org}
+      NEXT_PUBLIC_USDT_ADDRESS: ${NEXT_PUBLIC_USDT_ADDRESS:-}
+      NEXT_PUBLIC_CHARGER_CONTRACT_ADDRESS: ${NEXT_PUBLIC_CHARGER_CONTRACT_ADDRESS:-}
+      NEXT_PUBLIC_DEFAULT_APPROVE_AMOUNT: ${NEXT_PUBLIC_DEFAULT_APPROVE_AMOUNT:-}
+      NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.sourcofsun.online}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.sourcofsun.online}
+    ports:
+      - "127.0.0.1:3001:3001"

@@ -1,0 +1,22 @@
+{
+  "name": "dapp-auth-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "db:generate": "pnpm --filter @dapp/db exec prisma generate",
+    "db:push": "pnpm --filter @dapp/db exec prisma db push",
+    "db:migrate": "pnpm --filter @dapp/db exec prisma migrate dev",
+    "db:studio": "pnpm --filter @dapp/db exec prisma studio",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:up-build": "docker compose up -d --build"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@dapp/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000"
+  },
+  "dependencies": {
+    "@dapp/core": "workspace:*",
+    "@tanstack/react-query": "^5.56.0",
+    "next": "^14.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "siwe": "^2.1.4",
+    "viem": "^2.21.0",
+    "wagmi": "^2.12.0",
+    "@walletconnect/modal": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.3.3"
+  }
+}

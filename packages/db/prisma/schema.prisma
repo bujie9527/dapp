@@ -1,0 +1,88 @@
+// EVM Base dApp - Prisma schema
+// users, events, settings, charges
+// 支持扣费幂等、扩链、审计与更准确的状态机
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户：链上地址与 SIWE 会话
+model User {
+  id            String   @id @default(cuid())
+  address       String   @unique // 以太坊地址 0x...
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  events        Event[]
+  charges       Charge[]
+}
+
+// 关键动作事件：SIWE / APPROVE / CHARGE，状态 SUCCESS | REJECTED | FAILED
+model Event {
+  id           String   @id @default(cuid())
+  type         String   // SIWE | APPROVE | CHARGE
+  status       String   // SUCCESS | REJECTED | FAILED
+  address      String?  // 关联地址（可选，charge 可能由 admin 发起）
+  txHash       String?  // 链上交易哈希
+  errorSummary String?  @map("error_summary") // 失败时简短错误信息
+  errorCode    String?  @map("error_code")    // USER_REJECTED | RPC_ERROR | REVERTED | VALIDATION_FAILED 等
+  metadata     Json?    // 额外数据
+  actor        String?  // USER | ADMIN | SYSTEM
+  createdAt    DateTime @default(now())
+
+  userId   String?  @map("user_id")
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  chargeId String?  @map("charge_id")
+  charge   Charge?  @relation(fields: [chargeId], references: [id], onDelete: SetNull)
+
+  @@index([type, status])
+  @@index([address])
+  @@index([createdAt])
+  @@map("events")
+}
+
+// 业务配置：在 admin 后台编辑，写审计日志到 events 或单独 audit
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique // PUBLIC_BASE_URL, BASE_RPC_URL, USDT_ADDRESS, CHARGER_CONTRACT_ADDRESS, DEFAULT_APPROVE_AMOUNT, MAX_SINGLE_CHARGE_AMOUNT, CONFIRMATIONS_REQUIRED
+  value     String   // 字符串存储，前端/后端按需解析
+  updatedAt DateTime @updatedAt
+  updatedBy String?  @map("updated_by") // admin 标识，可选
+  @@map("settings")
+}
+
+// 扣费状态：已提交交易 / 链上确认成功 / 失败
+enum ChargeStatus {
+  SUBMITTED  // 交易已提交，待确认
+  CONFIRMED  // 链上确认成功
+  FAILED     // 提交失败或链上 revert
+}
+
+// 扣费记录：admin 发起的 charge 请求及链上结果，支持幂等与多链
+model Charge {
+  id             String       @id @default(cuid())
+  ref            String       @unique // 幂等键，业务生成（如 uuid 或 链+地址+批次）
+  address        String       // 被扣费地址
+  amount         String       // 金额（最小单位字符串）
+  chainId        Int          // 链 ID，第一期固定 8453（Base）
+  tokenAddress   String       @map("token_address") // 代币合约，第一期固定 Base USDT
+  status         ChargeStatus // SUBMITTED | CONFIRMED | FAILED
+  txHash         String?      @map("tx_hash")
+  errorSummary   String?      @map("error_summary")
+  requestedBy    String?      @map("requested_by") // 发起扣费的管理员用户名
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  userId String? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  events Event[]
+
+  @@index([address])
+  @@index([status])
+  @@index([createdAt])
+  @@map("charges")
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@dapp/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "hardhat compile",
+    "compile": "hardhat compile",
+    "deploy:charger": "hardhat run scripts/deployCharger.ts --network base",
+    "set-operator": "hardhat run scripts/setOperator.ts --network base"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.19.0"
+  }
+}
