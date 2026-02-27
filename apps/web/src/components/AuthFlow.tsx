@@ -6,6 +6,7 @@ import { SiweMessage } from "siwe";
 import { useSignMessage } from "wagmi";
 import { parseAbi } from "viem";
 import { useWalletClient } from "wagmi";
+import { MobileWalletLauncher } from "./MobileWalletLauncher";
 
 const BASE_CHAIN_ID = 8453;
 
@@ -16,15 +17,14 @@ const ERC20_ABI = parseAbi([
 
 type Step = "disconnected" | "connected" | "siwe" | "approve" | "done";
 
-function connectorLabel(id: string): string {
-  if (id === "walletConnect") return "WalletConnect";
-  if (id === "injected") return "浏览器扩展";
-  return id;
-}
-
 function isMobile(): boolean {
   if (typeof window === "undefined") return false;
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+}
+
+function hasInjected(): boolean {
+  if (typeof window === "undefined") return false;
+  return !!(window as unknown as { ethereum?: unknown }).ethereum;
 }
 
 export interface AuthFlowProps {
@@ -159,29 +159,86 @@ export function AuthFlow({
 
       {!isConnected && (
         <section style={{ marginBottom: "1.5rem" }}>
-          {connectors.map((c) => (
-            <button
-              key={c.uid}
-              onClick={() => connect({ connector: c })}
-              disabled={isPending}
-              style={{
-                padding: "0.75rem 1.25rem",
-                background: "#3b82f6",
-                border: "none",
-                borderRadius: 8,
-                color: "#fff",
-                cursor: isPending ? "not-allowed" : "pointer",
-                marginRight: 8,
-                marginBottom: 8,
-              }}
-            >
-              {isPending ? "连接中…" : connectorLabel(c.id)}
-            </button>
-          ))}
+          {(() => {
+            const injectedConnector = connectors.find((c) => c.id === "injected");
+            const wcConnector = connectors.find((c) => c.id === "walletConnect");
+            const connectWc = () => wcConnector && connect({ connector: wcConnector });
+            const mobileNoInjected = typeof window !== "undefined" && isMobile() && !hasInjected();
+
+            if (mobileNoInjected) {
+              return (
+                <>
+                  <MobileWalletLauncher onWalletConnect={connectWc} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={connectWc}
+                      disabled={isPending}
+                      style={{
+                        padding: "0.4rem 0.75rem",
+                        background: "transparent",
+                        border: "1px solid #64748b",
+                        borderRadius: 8,
+                        color: "#94a3b8",
+                        cursor: isPending ? "not-allowed" : "pointer",
+                        fontSize: "0.8125rem",
+                      }}
+                    >
+                      更多钱包
+                    </button>
+                  </div>
+                </>
+              );
+            }
+
+            const onPrimary =
+              injectedConnector && hasInjected()
+                ? () => connect({ connector: injectedConnector })
+                : connectWc;
+
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={onPrimary}
+                  disabled={isPending}
+                  style={{
+                    padding: "0.75rem 1.25rem",
+                    background: "#3b82f6",
+                    border: "none",
+                    borderRadius: 8,
+                    color: "#fff",
+                    cursor: isPending ? "not-allowed" : "pointer",
+                    fontSize: "1rem",
+                  }}
+                >
+                  {isPending ? "连接中…" : "连接钱包（推荐）"}
+                </button>
+                <button
+                  type="button"
+                  onClick={connectWc}
+                  disabled={isPending}
+                  style={{
+                    padding: "0.4rem 0.75rem",
+                    background: "transparent",
+                    border: "1px solid #64748b",
+                    borderRadius: 8,
+                    color: "#94a3b8",
+                    cursor: isPending ? "not-allowed" : "pointer",
+                    fontSize: "0.8125rem",
+                  }}
+                >
+                  更多钱包
+                </button>
+              </div>
+            );
+          })()}
           {isMobile() && (
-            <p style={{ fontSize: "0.875rem", color: "#94a3b8", marginTop: 8 }}>
-              支持 TokenPocket、MetaMask、Trust 等，请在弹窗中选择你的钱包。为减少步骤，建议在钱包 App 内打开本页：TokenPocket / MetaMask → 浏览器 / 发现 → 输入 dapp.sourcofsun.online
-            </p>
+            <div style={{ fontSize: "0.875rem", color: "#94a3b8", marginTop: 12, padding: "12px", background: "rgba(0,0,0,0.2)", borderRadius: 8 }}>
+              <p style={{ margin: "0 0 8px 0", fontWeight: 600, color: "#e2e8f0" }}>避免「在 TokenPocket 中打开此页？」提示</p>
+              <p style={{ margin: "0 0 6px 0" }}>请直接在钱包 App 内打开本页：打开 TokenPocket → 底部「浏览器」或「发现」→ 输入 <strong>dapp.sourcofsun.online</strong>，即可在 App 内连接，无需系统弹窗。</p>
+              <p style={{ margin: 0, opacity: 0.9 }}>若已在系统浏览器中打开，选择 WalletConnect 后点选 TokenPocket 时出现的「在 TokenPocket 中打开此页？」为系统安全提示，点击「打开」即可继续。</p>
+            </div>
           )}
         </section>
       )}

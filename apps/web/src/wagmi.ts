@@ -1,6 +1,7 @@
 import { createConfig, http } from "wagmi";
 import { injected, walletConnect } from "wagmi/connectors";
 import { base } from "wagmi/chains";
+import type { Connector } from "wagmi";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
@@ -28,3 +29,17 @@ export const config = createConfig({
   },
   ssr: true,
 });
+
+/**
+ * Injected 优先的连接策略：有 window.ethereum 时优先返回 injected，否则返回 walletConnect。
+ * 用于 UI 上优先展示/使用 injected（如钱包内置浏览器、浏览器插件）。
+ */
+export function getPreferredConnector(connectors: Connector[]): Connector | undefined {
+  const injectedConnector = connectors.find((c) => c.id === "injected");
+  const wcConnector = connectors.find((c) => c.id === "walletConnect");
+  if (typeof window === "undefined") return wcConnector ?? injectedConnector;
+  if ((window as unknown as { ethereum?: unknown }).ethereum) {
+    return injectedConnector ?? wcConnector;
+  }
+  return wcConnector ?? injectedConnector;
+}
