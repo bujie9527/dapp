@@ -1,13 +1,11 @@
 "use client";
 
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useConnect, useAccount, useDisconnect } from "wagmi";
 import { SiweMessage } from "siwe";
 import { useSignMessage } from "wagmi";
 import { parseAbi } from "viem";
 import { useWalletClient } from "wagmi";
-import { QRCodeSVG } from "qrcode.react";
-import type { Connector } from "wagmi";
 
 const BASE_CHAIN_ID = 8453;
 
@@ -18,8 +16,6 @@ const ERC20_ABI = parseAbi([
 
 type Step = "disconnected" | "connected" | "siwe" | "approve" | "done";
 
-const PREFERRED_WALLET_KEY = "dapp_wc_preferred_wallet";
-
 function connectorLabel(id: string): string {
   if (id === "walletConnect") return "WalletConnect";
   if (id === "injected") return "浏览器扩展";
@@ -29,36 +25,6 @@ function connectorLabel(id: string): string {
 function isMobile(): boolean {
   if (typeof window === "undefined") return false;
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-}
-
-type PreferredWallet = "metamask" | "trust" | "list";
-
-function getPreferredWallet(): PreferredWallet {
-  if (typeof window === "undefined") return "metamask";
-  const v = localStorage.getItem(PREFERRED_WALLET_KEY);
-  if (v === "trust" || v === "list") return v;
-  return "metamask";
-}
-
-function setPreferredWallet(w: PreferredWallet): void {
-  try {
-    localStorage.setItem(PREFERRED_WALLET_KEY, w);
-  } catch {
-    /**/
-  }
-}
-
-function openWalletDeepLink(uri: string, wallet: PreferredWallet): void {
-  const encoded = encodeURIComponent(uri);
-  if (wallet === "metamask") {
-    window.location.href = `https://metamask.app.link/wc?uri=${encoded}`;
-    return;
-  }
-  if (wallet === "trust") {
-    window.location.href = `https://link.trustwallet.com/wc?uri=${encoded}`;
-    return;
-  }
-  // "list" = show QR in UI, don't redirect
 }
 
 export interface AuthFlowProps {
@@ -84,8 +50,6 @@ export function AuthFlow({
   const [approveLoading, setApproveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [approveTxHash, setApproveTxHash] = useState<string | null>(null);
-  const [wcUri, setWcUri] = useState<string | null>(null);
-  const displayUriUnsubRef = useRef<(() => void) | null>(null);
 
   const fetchWithCreds = useCallback((url: string, opts: RequestInit = {}) => {
     return fetch(url, { ...opts, credentials: "include" });
@@ -172,49 +136,10 @@ export function AuthFlow({
     if (data.address && data.siweVerified) setStep("siwe");
   }, [fetchWithCreds, apiUrl]);
 
-  const handleConnectClick = useCallback(
-    async (connector: Connector) => {
-      if (connector.id !== "walletConnect") {
-        connect({ connector });
-        return;
-      }
-      const mobile = isMobile();
-      const preferred = getPreferredWallet();
-      try {
-        const connectorWithProvider = connector as Connector & { getProvider?: () => Promise<{ on?: (event: string, cb: (uri: string) => void) => void }> };
-        const prov = connectorWithProvider.getProvider?.();
-        if (prov) {
-          const p = await prov;
-          if (p?.on) {
-            const onUri = (uri: string) => {
-              setWcUri(uri);
-              if (mobile && preferred !== "list") {
-                openWalletDeepLink(uri, preferred);
-              }
-            };
-            p.on("display_uri", onUri);
-            displayUriUnsubRef.current = () => {
-              try {
-                p.off?.("display_uri", onUri);
-              } catch {
-                /**/
-              }
-            };
-          }
-        }
-      } catch {
-        /**/
-      }
-      connect({ connector });
-    },
-    [connect]
-  );
-
   useEffect(() => {
     if (isConnected && address) {
       setStep("connected");
       checkSession();
-      setWcUri(null);
     } else {
       setStep("disconnected");
     }
@@ -234,142 +159,31 @@ export function AuthFlow({
 
       {!isConnected && (
         <section style={{ marginBottom: "1.5rem" }}>
-          {isMobile()
-            ? (() => {
-                const wcConnector = connectors.find((c) => c.id === "walletConnect");
-                return wcConnector ? (
-                  <button
-                    onClick={() => handleConnectClick(wcConnector)}
-                    disabled={isPending}
-                    style={{
-                      padding: "0.75rem 1.25rem",
-                      background: "#3b82f6",
-                      border: "none",
-                      borderRadius: 8,
-                      color: "#fff",
-                      cursor: isPending ? "not-allowed" : "pointer",
-                      marginRight: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {isPending ? "连接中…" : "连接钱包"}
-                  </button>
-                ) : (
-                  connectors.map((c) => (
-                    <button
-                      key={c.uid}
-                      onClick={() => handleConnectClick(c)}
-                      disabled={isPending}
-                      style={{
-                        padding: "0.75rem 1.25rem",
-                        background: "#3b82f6",
-                        border: "none",
-                        borderRadius: 8,
-                        color: "#fff",
-                        cursor: isPending ? "not-allowed" : "pointer",
-                        marginRight: 8,
-                        marginBottom: 8,
-                      }}
-                    >
-                      {isPending ? "连接中…" : connectorLabel(c.id)}
-                    </button>
-                  ))
-                );
-              })()
-            : connectors.map((c) => (
-                <button
-                  key={c.uid}
-                  onClick={() => handleConnectClick(c)}
-                  disabled={isPending}
-                  style={{
-                    padding: "0.75rem 1.25rem",
-                    background: "#3b82f6",
-                    border: "none",
-                    borderRadius: 8,
-                    color: "#fff",
-                    cursor: isPending ? "not-allowed" : "pointer",
-                    marginRight: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  {isPending ? "连接中…" : connectorLabel(c.id)}
-                </button>
-              ))}
+          {connectors.map((c) => (
+            <button
+              key={c.uid}
+              onClick={() => connect({ connector: c })}
+              disabled={isPending}
+              style={{
+                padding: "0.75rem 1.25rem",
+                background: "#3b82f6",
+                border: "none",
+                borderRadius: 8,
+                color: "#fff",
+                cursor: isPending ? "not-allowed" : "pointer",
+                marginRight: 8,
+                marginBottom: 8,
+              }}
+            >
+              {isPending ? "连接中…" : connectorLabel(c.id)}
+            </button>
+          ))}
           {isMobile() && (
             <p style={{ fontSize: "0.875rem", color: "#94a3b8", marginTop: 8 }}>
-              手机端将直接打开已选钱包，{" "}
-              <button
-                type="button"
-                onClick={() => setPreferredWallet("list")}
-                style={{ background: "none", border: "none", color: "#60a5fa", cursor: "pointer", padding: 0, textDecoration: "underline" }}
-              >
-                使用其他钱包
-              </button>
+              支持 TokenPocket、MetaMask、Trust 等，请在弹窗中选择你的钱包。为减少步骤，建议在钱包 App 内打开本页：TokenPocket / MetaMask → 浏览器 / 发现 → 输入 dapp.sourcofsun.online
             </p>
           )}
         </section>
-      )}
-
-      {wcUri && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: 16,
-          }}
-          onClick={() => setWcUri(null)}
-        >
-          <div
-            style={{
-              background: "#1e293b",
-              borderRadius: 12,
-              padding: 24,
-              maxWidth: 320,
-              textAlign: "center",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p style={{ marginBottom: 16, color: "#e2e8f0" }}>用钱包扫描二维码连接</p>
-            <div style={{ background: "#fff", padding: 12, borderRadius: 8, display: "inline-block", marginBottom: 16 }}>
-              <QRCodeSVG value={wcUri} size={200} level="M" />
-            </div>
-            <p style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>或选择钱包打开</p>
-            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setPreferredWallet("metamask");
-                  openWalletDeepLink(wcUri, "metamask");
-                }}
-                style={{ padding: "8px 16px", background: "#3b82f6", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer" }}
-              >
-                MetaMask
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPreferredWallet("trust");
-                  openWalletDeepLink(wcUri, "trust");
-                }}
-                style={{ padding: "8px 16px", background: "#3375bb", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer" }}
-              >
-                Trust Wallet
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => setWcUri(null)}
-              style={{ marginTop: 16, padding: "8px 16px", background: "#475569", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer" }}
-            >
-              关闭
-            </button>
-          </div>
-        </div>
       )}
 
       {isConnected && step === "connected" && (
