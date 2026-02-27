@@ -1,0 +1,81 @@
+# 本地起 db + api + web + admin；反向代理占位（可后续加 TLS）
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dapp
+      POSTGRES_PASSWORD: dapp
+      POSTGRES_DB: dapp
+      ADMIN_USER: admin
+      ADMIN_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://dapp:dapp@db:5432/dapp
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CHARGER_PRIVATE_KEY: ${CHARGER_PRIVATE_KEY:-}
+      CHARGER_CONTRACT_ADDRESS: ${CHARGER_CONTRACT_ADDRESS:-}
+      BASE_RPC_URL: ${BASE_RPC_URL:-https://mainnet.base.org}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      ALLOW_BASIC_AUTH: ${ALLOW_BASIC_AUTH:-false}
+    ports:
+      - "4000:4000"
+    depends_on:
+      db: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_BASE_RPC_URL: ${NEXT_PUBLIC_BASE_RPC_URL:-https://mainnet.base.org}
+      NEXT_PUBLIC_USDT_ADDRESS: ${NEXT_PUBLIC_USDT_ADDRESS:-}
+      NEXT_PUBLIC_CHARGER_CONTRACT_ADDRESS: ${NEXT_PUBLIC_CHARGER_CONTRACT_ADDRESS:-}
+      NEXT_PUBLIC_DEFAULT_APPROVE_AMOUNT: ${NEXT_PUBLIC_DEFAULT_APPROVE_AMOUNT:-}
+      NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - api
+
+  # 反向代理占位（可选，后续可配置 TLS）
+  # proxy:
+  #   image: nginx:alpine
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   depends_on:
+  #     - web
+  #     - admin
+  #     - api
+
+volumes:
+  pgdata: {}
